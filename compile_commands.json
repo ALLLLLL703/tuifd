@@ -1,0 +1,100 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-I./include",
+      "-o",
+      "./build/tuifd",
+      "./src/cleanup.c"
+    ],
+    "directory": "/home/sanae/CodeProject/c/study/tuifd",
+    "file": "/home/sanae/CodeProject/c/study/tuifd/src/cleanup.c",
+    "output": "/home/sanae/CodeProject/c/study/tuifd/build/tuifd"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-I./include",
+      "-o",
+      "./build/tuifd",
+      "./src/layout.c"
+    ],
+    "directory": "/home/sanae/CodeProject/c/study/tuifd",
+    "file": "/home/sanae/CodeProject/c/study/tuifd/src/layout.c",
+    "output": "/home/sanae/CodeProject/c/study/tuifd/build/tuifd"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-I./include",
+      "-o",
+      "./build/tuifd",
+      "./src/ncur_init.c"
+    ],
+    "directory": "/home/sanae/CodeProject/c/study/tuifd",
+    "file": "/home/sanae/CodeProject/c/study/tuifd/src/ncur_init.c",
+    "output": "/home/sanae/CodeProject/c/study/tuifd/build/tuifd"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-I./include",
+      "-o",
+      "./build/tuifd",
+      "./src/options.c"
+    ],
+    "directory": "/home/sanae/CodeProject/c/study/tuifd",
+    "file": "/home/sanae/CodeProject/c/study/tuifd/src/options.c",
+    "output": "/home/sanae/CodeProject/c/study/tuifd/build/tuifd"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-I./include",
+      "-o",
+      "./build/tuifd",
+      "./src/result.c"
+    ],
+    "directory": "/home/sanae/CodeProject/c/study/tuifd",
+    "file": "/home/sanae/CodeProject/c/study/tuifd/src/result.c",
+    "output": "/home/sanae/CodeProject/c/study/tuifd/build/tuifd"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-I./include",
+      "-o",
+      "./build/tuifd",
+      "./src/search.c"
+    ],
+    "directory": "/home/sanae/CodeProject/c/study/tuifd",
+    "file": "/home/sanae/CodeProject/c/study/tuifd/src/search.c",
+    "output": "/home/sanae/CodeProject/c/study/tuifd/build/tuifd"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-I./include",
+      "-o",
+      "./build/tuifd",
+      "./src/tuifd.c"
+    ],
+    "directory": "/home/sanae/CodeProject/c/study/tuifd",
+    "file": "/home/sanae/CodeProject/c/study/tuifd/src/tuifd.c",
+    "output": "/home/sanae/CodeProject/c/study/tuifd/build/tuifd"
+  }
+]

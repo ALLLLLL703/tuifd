@@ -1,0 +1,10 @@
+[
+	{
+		"name": "make",
+		"command": "make tuifd.o"
+	},
+	{
+		"name": "run",
+		"command": "./build/tuifd"
+	}
+]
