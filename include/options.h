@@ -41,7 +41,7 @@ void handle_options_input(WINDOW *win, Options *opts, int ch);
 char *build_search_options(Options *opts);
 
 // 显示搜索结果
-void display_results(WINDOW *win, char **results, int result_count, int selected, Options *opts);
+void display_results(WINDOW *win, char **results, int result_count, int selected, int scroll_offset, Options *opts);
 
 // 打开选中的文件/目录
 void open_selected_file(const char *filepath);

@@ -1,7 +1,9 @@
 #include "options.h"
+#include "layout.h"
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /**
  * 初始化选项设置
@@ -202,24 +204,48 @@ char *build_search_options(Options *opts) {
  * 在结果窗口中显示搜索结果，并高亮选中的结果
  */
 void display_results(WINDOW *win, char **results, int result_count,
-                     int selected, Options *opts) {
+                     int selected, int scroll_offset, Options *opts) {
   wclear(win);
   box(win, 0, 0);
   mvwprintw(win, 0, 2, " Results ");
 
   if (results != NULL && result_count > 0) {
-    // 使用选项中的结果限制
-    int display_limit =
-        (result_count < opts->result_limit) ? result_count : opts->result_limit;
+    // 获取窗口高度
+    int win_height, win_width;
+    getmaxyx(win, win_height, win_width);
+    int max_display_lines = win_height - 2; // 减去边框
 
+    // 使用选项中的结果限制和窗口高度限制
+    int display_limit = (result_count < opts->result_limit) ? result_count : opts->result_limit;
+    display_limit = (display_limit < max_display_lines) ? display_limit : max_display_lines;
+
+    // 确保选中项在可见范围内
+    if (selected < scroll_offset) {
+      scroll_offset = selected;
+    } else if (selected >= scroll_offset + display_limit) {
+      scroll_offset = selected - display_limit + 1;
+    }
+
+    // 显示可见范围内的结果
     for (int i = 0; i < display_limit; i++) {
-      if (i == selected) {
-        wattron(win, A_REVERSE); // 高亮选中的结果
+      int result_index = scroll_offset + i;
+      if (result_index < result_count) {
+        if (result_index == selected) {
+          wattron(win, A_REVERSE); // 高亮选中的结果
+        }
+        mvwprintw(win, i + 1, 1, "%s", results[result_index]);
+        if (result_index == selected) {
+          wattroff(win, A_REVERSE); // 取消高亮
+        }
       }
-      mvwprintw(win, i + 1, 1, "%s", results[i]);
-      if (i == selected) {
-        wattroff(win, A_REVERSE); // 取消高亮
-      }
+    }
+
+    // 显示滚动指示器
+    if (scroll_offset > 0) {
+      mvwprintw(win, 0, getmaxx(win) - 3, "↑");
+    }
+    if (scroll_offset + display_limit < result_count) {
+      mvwprintw(win, getmaxy(win) - 1, getmaxx(win) - 3, "↓");
     }
   } else {
     mvwprintw(win, 1, 1, "No results found");
@@ -229,12 +255,95 @@ void display_results(WINDOW *win, char **results, int result_count,
 
 /**
  * 打开选中的文件/目录
- * 使用 xdg-open 命令打开选中的文件或目录
+ * 根据文件类型使用不同的程序打开
  */
 void open_selected_file(const char *filepath) {
   char command[1024];
-  snprintf(command, sizeof(command), "xdg-open \"%s\" 2>/dev/null &", filepath);
-  system(command);
+  char file_type[256];
+
+  // 使用 file 命令检测文件类型
+  snprintf(command, sizeof(command), "file -b \"%s\"", filepath);
+  FILE *fp = popen(command, "r");
+  if (fp) {
+    if (fgets(file_type, sizeof(file_type), fp)) {
+      // 移除换行符
+      size_t len = strlen(file_type);
+      if (len > 0 && file_type[len - 1] == '\n') {
+        file_type[len - 1] = '\0';
+      }
+    }
+    pclose(fp);
+  }
+
+  // 保存当前终端状态
+  def_prog_mode();
+  endwin();
+
+  // 根据文件类型选择打开方式
+  if (strstr(file_type, "directory") != NULL) {
+    // 目录 - 使用 yazi 打开
+    printf("Opening directory with yazi: %s\n", filepath);
+    snprintf(command, sizeof(command), "yazi \"%s\"", filepath);
+    system(command);
+  } else if (strstr(file_type, "text") != NULL ||
+             strstr(file_type, "ASCII") != NULL ||
+             strstr(file_type, "UTF-8") != NULL) {
+    // 文本文件 - 使用 nvim 打开
+    printf("Opening text file with nvim: %s\n", filepath);
+    snprintf(command, sizeof(command), "nvim \"%s\"", filepath);
+    system(command);
+  } else if (access(filepath, X_OK) == 0) {
+    // 可执行文件 - 同步执行
+    printf("Executing: %s\n", filepath);
+    snprintf(command, sizeof(command), "\"%s\"", filepath);
+    system(command);
+  } else {
+    // 其他文件类型 - 使用 xdg-open
+    printf("Opening with xdg-open: %s\n", filepath);
+
+    // 使用 fork 创建子进程运行 xdg-open
+    pid_t pid = fork();
+    if (pid == 0) {
+      // 子进程
+      snprintf(command, sizeof(command), "xdg-open \"%s\" 2>/dev/null",
+               filepath);
+      system(command);
+      exit(0);
+    } else if (pid > 0) {
+      // 父进程继续，不等待子进程
+      // 子进程会在后台运行，不会阻塞 TUI
+    } else {
+      // fork 失败，回退到原来的方法
+      snprintf(command, sizeof(command), "xdg-open \"%s\" 2>/dev/null &",
+               filepath);
+      system(command);
+    }
+  }
+
+  // 恢复 ncurses 模式
+  reset_prog_mode();
+  refresh();
+
+  // 完全重绘所有窗口
+  wclear(all_windows.options_win);
+  wclear(all_windows.results_win);
+  wclear(all_windows.search_win);
+
+  // 重新绘制窗口边框和标题
+  box(all_windows.options_win, 0, 0);
+  box(all_windows.results_win, 0, 0);
+  box(all_windows.search_win, 0, 0);
+  mvwprintw(all_windows.options_win, 0, 2, " Options ");
+  mvwprintw(all_windows.results_win, 0, 2, " Results ");
+  mvwprintw(all_windows.search_win, 0, 2, " Search ");
+
+  // 重新设置窗口颜色
+  wbkgd(all_windows.options_win, COLOR_PAIR(2));
+  wbkgd(all_windows.results_win, COLOR_PAIR(1));
+  wbkgd(all_windows.search_win, COLOR_PAIR(3));
+
+  // 刷新所有窗口
+  refresh_all(all_windows);
 }
 
 /**
