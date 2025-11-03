@@ -24,6 +24,7 @@ typedef struct {
     char *file_type;        // 文件类型过滤
     SortBy sort_by;         // 排序方式
     int selected_option;    // 当前选中的选项索引
+		char* search_path;
 } Options;
 
 // 函数声明

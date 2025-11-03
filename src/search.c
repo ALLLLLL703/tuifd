@@ -26,7 +26,7 @@ char *handle_input(WINDOW *win, char *input_buffer) {
       if (len > 0) {
         buffer[len - 1] = '\0';
       }
-    } else if (ch == KEY_DOWN) {
+    } else if (ch == 9) {
       return NULL;
     }
 

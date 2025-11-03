@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
   int search_insert_mode = 1;            // 搜索窗口插入模式标志
 
   // 主循环 - 监听用户输入
-  while ((ch = getch()) != KEY_F(1)) {
+  while ((ch = getch()) != KEY_F(1) && ch != '') {
     if (ch == '\t') { // Tab 键循环切换窗口
       // 切换到下一个窗口
       current_window = (current_window + 1) % TOTAL_WINDOWS;
@@ -68,7 +68,6 @@ int main(int argc, char *argv[]) {
         wattroff(wins.search_win, A_BOLD);
 
         // 立即进入插入模式处理搜索输入
-        handle_input(wins.search_win, search_buffer);
         break;
 
       case OPTIONS_WINDOW_ID:
@@ -90,7 +89,7 @@ int main(int argc, char *argv[]) {
       switch (current_window) {
       case SEARCH_WINDOW_ID:
         // 搜索窗口 - 处理搜索输入
-        if (ch == '\n' || ch == KEY_ENTER) {
+        if (ch) {
           // 清空之前的搜索内容
           strcpy(search_buffer, "");
 
@@ -111,8 +110,10 @@ int main(int argc, char *argv[]) {
             char *search_options = build_search_options(&options);
 
             // 获取搜索结果
-            search_results =
-                getoutput(search_options, search_buffer, search_path, &result_count);
+            char *actual_search_path =
+                options.search_path ? options.search_path : search_path;
+            search_results = getoutput(search_options, search_buffer,
+                                       actual_search_path, &result_count);
 
             // 显示结果
             wclear(wins.results_win);
@@ -144,14 +145,14 @@ int main(int argc, char *argv[]) {
 
       case RESULT_WINDOW_ID:
         // 结果窗口 - 处理结果导航和选择
-        if (ch == KEY_UP) {
+        if (ch == KEY_UP || ch == 'k') {
           // 向上选择结果
           if (selected_result > 0) {
             selected_result--;
           }
           display_results(wins.results_win, search_results, result_count,
                           selected_result, scroll_offset, &options);
-        } else if (ch == KEY_DOWN) {
+        } else if (ch == KEY_DOWN || ch == 'j') {
           // 向下选择结果
           if (selected_result < result_count - 1 &&
               selected_result < options.result_limit - 1) {
@@ -159,15 +160,16 @@ int main(int argc, char *argv[]) {
           }
           display_results(wins.results_win, search_results, result_count,
                           selected_result, scroll_offset, &options);
-        } else if (ch == KEY_PPAGE) {
+        } else if (ch == KEY_PPAGE || ch == '') {
           // Page Up - 向上滚动
           if (scroll_offset > 0) {
             scroll_offset -= 5; // 每次滚动5行
-            if (scroll_offset < 0) scroll_offset = 0;
+            if (scroll_offset < 0)
+              scroll_offset = 0;
             display_results(wins.results_win, search_results, result_count,
                             selected_result, scroll_offset, &options);
           }
-        } else if (ch == KEY_NPAGE) {
+        } else if (ch == KEY_NPAGE || ch == '') {
           // Page Down - 向下滚动
           if (scroll_offset + options.result_limit < result_count) {
             scroll_offset += 5; // 每次滚动5行
@@ -183,7 +185,8 @@ int main(int argc, char *argv[]) {
               selected_result < result_count) {
             // 保存当前程序状态到缓存
             save_program_state(search_buffer, search_results, result_count,
-                               selected_result, scroll_offset, current_window, &options);
+                               selected_result, scroll_offset, current_window,
+                               &options);
 
             open_selected_file(search_results[selected_result]);
 

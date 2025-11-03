@@ -9,17 +9,19 @@
  * 初始化选项设置
  * 设置默认的搜索和显示选项
  */
-char *search_str[6] = {"[%c] 区分大小写", "[%c] 包含隐藏文件", "深度限制: %d",
-                       "结果限制: %d",    "排序方式: %s",      "排序方式: %s"};
+char *search_str[7] = {"[%c] 区分大小写", "[%c] 包含隐藏文件", "深度限制: %d",
+                       "结果限制: %d",    "排序方式: %s",      "文件类型: %s",
+                       "搜索路径: %s"};
 
 Options init_options() {
   Options opts = {
       .case_sensitive = 0,  // 默认不区分大小写
       .include_hidden = 0,  // 默认不包含隐藏文件
       .max_depth = 0,       // 默认无深度限制
-      .result_limit = 20,   // 默认显示20个结果
+      .result_limit = 2000, // 默认显示20个结果
       .file_type = NULL,    // 默认无文件类型限制
       .sort_by = SORT_NAME, // 默认按名称排序
+      .search_path = NULL,  // 默认搜索路径
       .selected_option = 0  // 默认选中第一个选项
   };
   return opts;
@@ -38,7 +40,7 @@ void display_options(WINDOW *win, Options *opts) {
   int y = 1;
 
   // 搜索选项
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 7; i++) {
     if (i == opts->selected_option) {
       wattron(win, A_REVERSE); // 高亮选中的选项
     }
@@ -67,6 +69,13 @@ void display_options(WINDOW *win, Options *opts) {
         mvwprintw(win, y++, 2, "文件类型: %s", opts->file_type);
       } else {
         mvwprintw(win, y++, 2, "文件类型: 所有文件");
+      }
+      break;
+    case 6:
+      if (opts->search_path) {
+        mvwprintw(win, y++, 2, "搜索路径: %s", opts->search_path);
+      } else {
+        mvwprintw(win, y++, 2, "搜索路径: 当前目录");
       }
       break;
     }
@@ -131,6 +140,25 @@ static void handle_option_edit(WINDOW *win, Options *opts) {
       }
     }
     break;
+
+  case 6: // 搜索路径
+    mvwprintw(win, getmaxy(win) - 1, 2, ":");
+    wrefresh(win);
+    echo();
+    wgetnstr(win, input_buffer, sizeof(input_buffer) - 1);
+    noecho();
+    if (strlen(input_buffer) > 0) {
+      if (opts->search_path) {
+        free(opts->search_path);
+      }
+      opts->search_path = strdup(input_buffer);
+    } else {
+      if (opts->search_path) {
+        free(opts->search_path);
+        opts->search_path = NULL;
+      }
+    }
+    break;
   }
 }
 
@@ -139,14 +167,16 @@ static void handle_option_edit(WINDOW *win, Options *opts) {
  * 处理用户在选项窗口中的按键输入
  */
 void handle_options_input(WINDOW *win, Options *opts, int ch) {
-  int option_count = 6; // 当前选项数量
+  int option_count = 7; // 当前选项数量
 
   switch (ch) {
   case KEY_UP:
+  case 'k':
     opts->selected_option =
         (opts->selected_option - 1 + option_count) % option_count;
     break;
   case KEY_DOWN:
+  case 'j':
     opts->selected_option = (opts->selected_option + 1) % option_count;
     break;
   case ' ':
@@ -216,8 +246,10 @@ void display_results(WINDOW *win, char **results, int result_count,
     int max_display_lines = win_height - 2; // 减去边框
 
     // 使用选项中的结果限制和窗口高度限制
-    int display_limit = (result_count < opts->result_limit) ? result_count : opts->result_limit;
-    display_limit = (display_limit < max_display_lines) ? display_limit : max_display_lines;
+    int display_limit =
+        (result_count < opts->result_limit) ? result_count : opts->result_limit;
+    display_limit =
+        (display_limit < max_display_lines) ? display_limit : max_display_lines;
 
     // 确保选中项在可见范围内
     if (selected < scroll_offset) {
@@ -276,53 +308,47 @@ void open_selected_file(const char *filepath) {
   }
 
   // 保存当前终端状态
-  def_prog_mode();
-  endwin();
 
   // 根据文件类型选择打开方式
+  // 目录 - 使用 yazi 打开
   if (strstr(file_type, "directory") != NULL) {
-    // 目录 - 使用 yazi 打开
+    def_prog_mode();
+    endwin();
     printf("Opening directory with yazi: %s\n", filepath);
     snprintf(command, sizeof(command), "yazi \"%s\"", filepath);
+
+    // 使用 fork 创建子进程运行 yazi
+    // 父进程继续，不等待子进程
+    // 子进程会在后台运行，不会阻塞 TUI
+    // fork 失败，回退到原来的方法
     system(command);
   } else if (strstr(file_type, "text") != NULL ||
              strstr(file_type, "ASCII") != NULL ||
              strstr(file_type, "UTF-8") != NULL) {
     // 文本文件 - 使用 nvim 打开
+    def_prog_mode();
+    endwin();
     printf("Opening text file with nvim: %s\n", filepath);
     snprintf(command, sizeof(command), "nvim \"%s\"", filepath);
+
     system(command);
   } else if (access(filepath, X_OK) == 0) {
     // 可执行文件 - 同步执行
+    def_prog_mode();
+    endwin();
+
     printf("Executing: %s\n", filepath);
     snprintf(command, sizeof(command), "\"%s\"", filepath);
     system(command);
   } else {
-    // 其他文件类型 - 使用 xdg-open
     printf("Opening with xdg-open: %s\n", filepath);
-
-    // 使用 fork 创建子进程运行 xdg-open
-    pid_t pid = fork();
-    if (pid == 0) {
-      // 子进程
-      snprintf(command, sizeof(command), "xdg-open \"%s\" 2>/dev/null",
-               filepath);
-      system(command);
-      exit(0);
-    } else if (pid > 0) {
-      // 父进程继续，不等待子进程
-      // 子进程会在后台运行，不会阻塞 TUI
-    } else {
-      // fork 失败，回退到原来的方法
-      snprintf(command, sizeof(command), "xdg-open \"%s\" 2>/dev/null &",
-               filepath);
-      system(command);
-    }
+    snprintf(command, sizeof(command), "nohup xdg-open \"%s\" &>/dev/null &",
+             filepath);
+    system(command);
   }
 
   // 恢复 ncurses 模式
   reset_prog_mode();
-  refresh();
 
   // 完全重绘所有窗口
   wclear(all_windows.options_win);
@@ -342,8 +368,10 @@ void open_selected_file(const char *filepath) {
   wbkgd(all_windows.results_win, COLOR_PAIR(1));
   wbkgd(all_windows.search_win, COLOR_PAIR(3));
 
+xdg_open:
   // 刷新所有窗口
   refresh_all(all_windows);
+  refresh();
 }
 
 /**
@@ -353,5 +381,8 @@ void open_selected_file(const char *filepath) {
 void cleanup_options(Options *opts) {
   if (opts->file_type) {
     free(opts->file_type);
+  }
+  if (opts->search_path) {
+    free(opts->search_path);
   }
 }
