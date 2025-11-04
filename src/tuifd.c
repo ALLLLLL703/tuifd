@@ -3,6 +3,7 @@
 #include "layout.h"
 #include "options.h"
 #include "search.h"
+#include "tools.h"
 #include <locale.h>
 #include <ncurses.h>
 #include <stdlib.h>
@@ -13,6 +14,13 @@
 #define SEARCH_WINDOW_ID 0
 #define TOTAL_WINDOWS 3
 
+void init() {
+  init_ncurses();
+  init_colors();
+  setup_input();
+}
+
+int motion_count_regist = 0;
 /**
  * TUI 文件搜索程序主函数
  * 使用 ncurses 库创建基于终端的用户界面
@@ -24,9 +32,7 @@ int main(int argc, char *argv[]) {
   setlocale(LC_ALL, ""); // 设置本地化，支持中文显示
 
   // 初始化 ncurses
-  init_ncurses();
-  init_colors();
-  setup_input();
+  init();
 
   // 创建窗口布局
   Windows wins = draw_windows();
@@ -147,16 +153,23 @@ int main(int argc, char *argv[]) {
         // 结果窗口 - 处理结果导航和选择
         if (ch == KEY_UP || ch == 'k') {
           // 向上选择结果
-          if (selected_result > 0) {
-            selected_result--;
+          selected_result -= motion_count_regist >= 1 ? motion_count_regist : 1;
+          motion_count_regist = 0;
+
+          if (selected_result < 0) {
+            selected_result = 0;
           }
           display_results(wins.results_win, search_results, result_count,
                           selected_result, scroll_offset, &options);
         } else if (ch == KEY_DOWN || ch == 'j') {
           // 向下选择结果
-          if (selected_result < result_count - 1 &&
-              selected_result < options.result_limit - 1) {
-            selected_result++;
+          selected_result += motion_count_regist >= 1 ? motion_count_regist : 1;
+          motion_count_regist = 0;
+          if (selected_result > result_count - 1 ||
+              selected_result > options.result_limit - 1) {
+            selected_result = result_count >= options.result_limit
+                                  ? options.result_limit - 1
+                                  : result_count - 1;
           }
           display_results(wins.results_win, search_results, result_count,
                           selected_result, scroll_offset, &options);
@@ -222,6 +235,10 @@ int main(int argc, char *argv[]) {
                               selected_result, scroll_offset, &options);
             }
           }
+        } else if (ch >= '0' && ch <= '9') {
+
+          ch = ch - '0';
+          motion_count_regist = motion_count_regist * 10 + ch;
         }
         break;
       }
