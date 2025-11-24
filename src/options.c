@@ -9,9 +9,9 @@
  * 初始化选项设置
  * 设置默认的搜索和显示选项
  */
-char *search_str[7] = {"[%c] 区分大小写", "[%c] 包含隐藏文件", "深度限制: %d",
-                       "结果限制: %d",    "排序方式: %s",      "文件类型: %s",
-                       "搜索路径: %s"};
+char *search_str[8] = {"[%c] 区分大小写", "[%c] 包含隐藏文件", "深度限制: %d",
+                       "结果限制: %d",    "排序方式: %s",      "文件扩展名: %s",
+                       "搜索路径: %s",    "文件类型: %s"};
 
 Options init_options() {
   Options opts = {
@@ -19,10 +19,12 @@ Options init_options() {
       .include_hidden = 0,  // 默认不包含隐藏文件
       .max_depth = 0,       // 默认无深度限制
       .result_limit = 2000, // 默认显示20个结果
-      .file_type = NULL,    // 默认无文件类型限制
+      .file_ext = NULL,     // 默认无文件类型限制
       .sort_by = SORT_NAME, // 默认按名称排序
       .search_path = NULL,  // 默认搜索路径
-      .selected_option = 0  // 默认选中第一个选项
+      .selected_option = 0, // 默认选中第一个选项
+      .file_type = NULL,
+
   };
   return opts;
 }
@@ -40,7 +42,7 @@ void display_options(WINDOW *win, Options *opts) {
   int y = 1;
 
   // 搜索选项
-  for (int i = 0; i < 7; i++) {
+  for (int i = 0; i < 8; i++) {
     if (i == opts->selected_option) {
       wattron(win, A_REVERSE); // 高亮选中的选项
     }
@@ -59,16 +61,17 @@ void display_options(WINDOW *win, Options *opts) {
       break;
     case 3:
       mvwprintw(win, y++, 2, "结果限制: %d", opts->result_limit);
+      printf("%s", search_str[1]);
       break;
     case 4: {
       const char *sort_names[] = {"名称", "大小", "修改时间"};
       mvwprintw(win, y++, 2, "排序方式: %s", sort_names[opts->sort_by]);
     } break;
     case 5:
-      if (opts->file_type) {
-        mvwprintw(win, y++, 2, "文件类型: %s", opts->file_type);
+      if (opts->file_ext) {
+        mvwprintw(win, y++, 2, "文件扩展名: %s", opts->file_ext);
       } else {
-        mvwprintw(win, y++, 2, "文件类型: 所有文件");
+        mvwprintw(win, y++, 2, "文件扩展名: 所有文件");
       }
       break;
     case 6:
@@ -78,6 +81,14 @@ void display_options(WINDOW *win, Options *opts) {
         mvwprintw(win, y++, 2, "搜索路径: 当前目录");
       }
       break;
+    case 7:
+      if (opts->file_type) {
+        mvwprintw(win, y++, 2, "文件类型: %s", opts->file_type);
+
+      } else {
+
+        mvwprintw(win, y++, 2, "文件类型: %s", "all");
+      }
     }
 
     if (i == opts->selected_option) {
@@ -129,14 +140,14 @@ static void handle_option_edit(WINDOW *win, Options *opts) {
     wgetnstr(win, input_buffer, sizeof(input_buffer) - 1);
     noecho();
     if (strlen(input_buffer) > 0) {
-      if (opts->file_type) {
-        free(opts->file_type);
+      if (opts->file_ext) {
+        free(opts->file_ext);
       }
-      opts->file_type = strdup(input_buffer);
+      opts->file_ext = strdup(input_buffer);
     } else {
-      if (opts->file_type) {
-        free(opts->file_type);
-        opts->file_type = NULL;
+      if (opts->file_ext) {
+        free(opts->file_ext);
+        opts->file_ext = NULL;
       }
     }
     break;
@@ -159,6 +170,24 @@ static void handle_option_edit(WINDOW *win, Options *opts) {
       }
     }
     break;
+  case 7:
+    mvwprintw(win, getmaxy(win) - 1, 2, ":");
+    wrefresh(win);
+    echo();
+    wgetnstr(win, input_buffer, sizeof(input_buffer) - 1);
+    noecho();
+    if (strlen(input_buffer) > 0) {
+      if (opts->file_type) {
+        free(opts->file_type);
+      }
+      opts->file_type = strdup(input_buffer);
+    } else {
+      if (opts->file_type) {
+        free(opts->file_type);
+        opts->file_type = NULL;
+      }
+    }
+    break;
   }
 }
 
@@ -167,7 +196,7 @@ static void handle_option_edit(WINDOW *win, Options *opts) {
  * 处理用户在选项窗口中的按键输入
  */
 void handle_options_input(WINDOW *win, Options *opts, int ch) {
-  int option_count = 7; // 当前选项数量
+  int option_count = 8; // 当前选项数量
 
   switch (ch) {
   case KEY_UP:
@@ -220,9 +249,14 @@ char *build_search_options(Options *opts) {
     strcat(options, depth_str);
   }
 
+  if (opts->file_ext) {
+    char ext_str[50];
+    snprintf(ext_str, sizeof(ext_str), " -e %s", opts->file_ext);
+    strcat(options, ext_str);
+  }
   if (opts->file_type) {
-    char type_str[50];
-    snprintf(type_str, sizeof(type_str), " -e %s", opts->file_type);
+    char type_str[20];
+    snprintf(type_str, sizeof(type_str), " -t %s", opts->file_type);
     strcat(options, type_str);
   }
 
@@ -340,6 +374,12 @@ void open_selected_file(const char *filepath) {
     printf("Executing: %s\n", filepath);
     snprintf(command, sizeof(command), "\"%s\"", filepath);
     system(command);
+  } else if (strstr(filepath, "microsoft.portable") != NULL) {
+    def_prog_mode();
+    endwin();
+    printf("Executing microsoft portable: %s\n", filepath);
+    snprintf(command, sizeof(command), "wine %s", filepath);
+    system(command);
   } else {
     printf("Opening with xdg-open: %s\n", filepath);
     snprintf(command, sizeof(command), "nohup xdg-open \"%s\" &>/dev/null &",
@@ -379,8 +419,8 @@ xdg_open:
  * 释放选项结构体中分配的内存
  */
 void cleanup_options(Options *opts) {
-  if (opts->file_type) {
-    free(opts->file_type);
+  if (opts->file_ext) {
+    free(opts->file_ext);
   }
   if (opts->search_path) {
     free(opts->search_path);

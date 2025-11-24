@@ -2,6 +2,8 @@
 #define OPTIONS_H
 
 #include <ncurses.h>
+#include <toml.h>
+
 
 /**
  * 选项相关定义
@@ -21,10 +23,11 @@ typedef struct {
     int include_hidden;     // 是否包含隐藏文件
     int max_depth;          // 搜索深度限制
     int result_limit;       // 结果数量限制
-    char *file_type;        // 文件类型过滤
+    char *file_ext;        // 文件类型过滤
     SortBy sort_by;         // 排序方式
     int selected_option;    // 当前选中的选项索引
 		char* search_path;
+		char* file_type;
 } Options;
 
 // 函数声明

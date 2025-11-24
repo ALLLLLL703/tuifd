@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
   int search_insert_mode = 1;            // 搜索窗口插入模式标志
 
   // 主循环 - 监听用户输入
-  while ((ch = getch()) != KEY_F(1) && ch != '') {
+  while ((ch = getch()) != KEY_F(1) && ch != 6) {
     if (ch == '\t') { // Tab 键循环切换窗口
       // 切换到下一个窗口
       current_window = (current_window + 1) % TOTAL_WINDOWS;
@@ -159,6 +159,9 @@ int main(int argc, char *argv[]) {
           if (selected_result < 0) {
             selected_result = 0;
           }
+          if (scroll_offset == getmaxy(wins.results_win) - 3) {
+            scroll_offset -= 5;
+          }
           display_results(wins.results_win, search_results, result_count,
                           selected_result, scroll_offset, &options);
         } else if (ch == KEY_DOWN || ch == 'j') {
@@ -171,9 +174,12 @@ int main(int argc, char *argv[]) {
                                   ? options.result_limit - 1
                                   : result_count - 1;
           }
+          if (scroll_offset <= 3 && selected_result > 4) {
+            scroll_offset += 5;
+          }
           display_results(wins.results_win, search_results, result_count,
                           selected_result, scroll_offset, &options);
-        } else if (ch == KEY_PPAGE || ch == '') {
+        } else if (ch == KEY_PPAGE || ch == 21 || ch == 'e') {
           // Page Up - 向上滚动
           if (scroll_offset > 0) {
             scroll_offset -= 5; // 每次滚动5行
@@ -182,12 +188,16 @@ int main(int argc, char *argv[]) {
             display_results(wins.results_win, search_results, result_count,
                             selected_result, scroll_offset, &options);
           }
-        } else if (ch == KEY_NPAGE || ch == '') {
+        } else if (ch == KEY_NPAGE || ch == 4 || ch == 'd') {
           // Page Down - 向下滚动
-          if (scroll_offset + options.result_limit < result_count) {
+          int win_height, win_width;
+          getmaxyx(wins.results_win, win_height, win_width);
+          int max_display_lines = win_height - 2; // 减去边框
+
+          if (scroll_offset + max_display_lines < result_count) {
             scroll_offset += 5; // 每次滚动5行
-            if (scroll_offset + options.result_limit > result_count) {
-              scroll_offset = result_count - options.result_limit;
+            if (scroll_offset + max_display_lines > result_count) {
+              scroll_offset = result_count - max_display_lines;
             }
             display_results(wins.results_win, search_results, result_count,
                             selected_result, scroll_offset, &options);
